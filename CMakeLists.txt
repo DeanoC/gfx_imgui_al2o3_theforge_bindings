@@ -28,7 +28,11 @@ set(Src
 
 set(Deps
 		al2o3_platform
+		al2o3_memory
 		gfx_imgui
+		gfx_theforge
+		gfx_shadercompiler
+		input_basic_interface
 		)
 ADD_LIB(${LibName} "${Interface}" "${Src}" "${Deps}")
 
