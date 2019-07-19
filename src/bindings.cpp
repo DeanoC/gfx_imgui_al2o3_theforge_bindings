@@ -101,9 +101,6 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 	VFile_Close(vfile);
 	VFile_Close(ffile);
 
-	LOGINFO((char*)vout.shader);
-	LOGINFO((char*)fout.shader);
-
 	if (!vokay || !fokay) {
 		MEMORY_FREE((void *) vout.log);
 		MEMORY_FREE((void *) vout.shader);
