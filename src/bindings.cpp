@@ -3,10 +3,20 @@
 #include "gfx_imgui_al2o3_theforge_bindings/bindings.h"
 #include "gfx_imgui/imgui.h"
 
+enum InputIds {
+	MouseX,
+	MouseY,
+	MouseLeftClick,
+	MouseRightClick,
+};
+
 struct ImguiBindings_Context {
 	TheForge_RendererHandle renderer;
 	ShaderCompiler_ContextHandle shaderCompiler;
+
 	InputBasic_ContextHandle input;
+	uint32_t userIdBlock;
+	InputBasic_MouseHandle mouse;
 
 	uint32_t maxDynamicUIUpdatesPerBatch;
 	uint32_t maxFrames;
@@ -66,10 +76,13 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 																						"\tfloat4 Colour   : COLOR;\n"
 																						"};\n"
 																						"\n"
-																						"float4 FS_main(FSInput input) : SV_TARGET\n"
+																						"Texture2D colourTexture : register(t1);\n"
+																						"SamplerState bilinearSampler : register(s1);\n"
+																						"float4 FS_main(FSInput input) : SV_Target\n"
 																						"{\n"
-																						"\treturn float4(1,0,0,1);\n//input.Colour;\n"
-																						"}";
+																						"\treturn input.Colour * colourTexture.Sample(bilinearSampler, input.Uv);\n"
+																						"}\n";
+
 	static char const *const vertEntryPoint = "VS_main";
 	static char const *const fragEntryPoint = "FS_main";
 
@@ -80,6 +93,23 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 	if (!ffile) {
 		VFile_Close(vfile);
 		return false;
+	}
+
+	{
+		ShaderCompiler_Output vout;
+		bool vokay = ShaderCompiler_CompileShader(
+				ShaderCompiler_LANG_HLSL,
+				ShaderCompiler_ST_VertexShader,
+				"ImguiBindings_VertexShader", vertEntryPoint, vfile,
+				ShaderCompiler_OPT_None,
+				ShaderCompiler_OT_MSL_OSX,
+				10,
+				&vout);
+		if (vout.log != nullptr) {
+			LOGWARNINGF("Shader compiler : %s %s", vokay ? "warnings" : "ERROR", vout.log);
+		}
+		LOGINFO((char *) vout.shader);
+
 	}
 
 	ShaderCompiler_Output vout;
@@ -124,11 +154,11 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 #else
 	TheForge_BinaryShaderDesc bdesc;
 	bdesc.stages = (TheForge_ShaderStage) (TheForge_SS_FRAG | TheForge_SS_VERT);
-	bdesc.vert.byteCode = (char*) vout.shader;
-	bdesc.vert.byteCodeSize = (uint32_t)vout.shaderSize;
+	bdesc.vert.byteCode = (char *) vout.shader;
+	bdesc.vert.byteCodeSize = (uint32_t) vout.shaderSize;
 	bdesc.vert.entryPoint = vertEntryPoint;
-	bdesc.frag.byteCode = (char*) fout.shader;
-	bdesc.frag.byteCodeSize = (uint32_t)fout.shaderSize;
+	bdesc.frag.byteCode = (char *) fout.shader;
+	bdesc.frag.byteCodeSize = (uint32_t) fout.shaderSize;
 	bdesc.frag.entryPoint = fragEntryPoint;
 	TheForge_AddShaderBinary(ctx->renderer, &bdesc, &ctx->shader);
 #endif
@@ -145,8 +175,10 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 	ImGuiIO &io = ImGui::GetIO();
 	io.Fonts->AddFontDefault();
 	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
 	TheForge_RawImageData rawData{
-			pixels, TheForge_IF_RGBA8,
+			pixels,
+			TheForge_IF_RGBA8,
 			(uint32_t) width,
 			(uint32_t) height,
 			1,
@@ -154,13 +186,15 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 			1
 	};
 
-	TheForge_TextureLoadDesc loadDesc = {};
+	TheForge_TextureLoadDesc loadDesc{};
 	loadDesc.pRawImageData = &rawData;
 	loadDesc.pTexture = &ctx->fontTexture;
 	loadDesc.mCreationFlag = TheForge_TCF_OWN_MEMORY_BIT;
 	TheForge_LoadTexture(&loadDesc, false);
 	if (!ctx->fontTexture)
 		return false;
+
+	ImGui::GetIO().Fonts->TexID = (void *) ctx->fontTexture;
 
 	return true;
 }
@@ -220,8 +254,8 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			}
 	};
 	static TheForge_BlendStateDesc const blendDesc{
-			{TheForge_BC_ONE},
-			{TheForge_BC_ZERO},
+			{TheForge_BC_SRC_ALPHA},
+			{TheForge_BC_ONE_MINUS_SRC_ALPHA},
 			{TheForge_BC_ONE},
 			{TheForge_BC_ZERO},
 			{TheForge_BM_ADD},
@@ -300,7 +334,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 
 	TheForge_ShaderHandle shaders[]{ctx->shader};
 	TheForge_SamplerHandle samplers[]{ctx->bilinearSampler};
-	char const *staticSamplerNames[]{"BilinearSampler"};
+	char const *staticSamplerNames[]{"bilinearSampler"};
 
 	TheForge_RootSignatureDesc rootSignatureDesc{};
 	rootSignatureDesc.shaderCount = 1;
@@ -391,6 +425,25 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 		return nullptr;
 	}
 
+	ctx->userIdBlock = InputBasic_AllocateUserIdBlock(input);
+	if (InputBasic_GetMouseCount(input) > 0) {
+		ctx->mouse = InputBasic_MouseCreate(input, 0);
+	}
+	InputBasic_MapToMouseAxis(ctx->input,
+														ctx->userIdBlock + InputIds::MouseX,
+														ctx->mouse, InputBasis_Axis_X);
+
+	InputBasic_MapToMouseAxis(ctx->input,
+														ctx->userIdBlock + InputIds::MouseY,
+														ctx->mouse, InputBasis_Axis_Y);
+	InputBasic_MapToMouseButton(ctx->input,
+															ctx->userIdBlock + InputIds::MouseLeftClick,
+															ctx->mouse, InputBasic_MouseButton_Left);
+
+	InputBasic_MapToMouseButton(ctx->input,
+															ctx->userIdBlock + (uint32_t) InputIds::MouseRightClick,
+															ctx->mouse, InputBasic_MouseButton_Right);
+
 	return ctx;
 }
 
@@ -398,6 +451,8 @@ AL2O3_EXTERN_C void ImguiBindings_Destroy(ImguiBindings_ContextHandle handle) {
 	auto ctx = (ImguiBindings_Context *) handle;
 	if (!ctx)
 		return;
+
+	InputBasic_MouseDestroy(ctx->mouse);
 
 	if (ctx->context)
 		ImGui::DestroyContext(ctx->context);
@@ -414,13 +469,23 @@ AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle hand
 		return;
 
 	ImGuiIO &io = ImGui::GetIO();
-	io.DisplaySize.x = (float)width;
-	io.DisplaySize.y = (float)height;
+	io.DisplaySize.x = (float) width;
+	io.DisplaySize.y = (float) height;
 }
 
-AL2O3_EXTERN_C void ImguiBindings_SetDeltaTime(ImguiBindings_ContextHandle handle, double deltaTimeInMS) {
+AL2O3_EXTERN_C bool ImguiBindings_UpdateInput(ImguiBindings_ContextHandle handle, double deltaTimeInMS) {
+	auto ctx = (ImguiBindings_Context *) handle;
+	if (!ctx)
+		return false;
 	ImGuiIO &io = ImGui::GetIO();
 	io.DeltaTime = (float) deltaTimeInMS;
+
+	io.MousePos.x = InputBasic_GetAsFloat(ctx->input, ctx->userIdBlock + InputIds::MouseX) * io.DisplaySize.x;
+	io.MousePos.y = InputBasic_GetAsFloat(ctx->input, ctx->userIdBlock + InputIds::MouseY) * io.DisplaySize.y;
+	io.MouseDown[0] = InputBasic_GetAsBool(ctx->input, ctx->userIdBlock + InputIds::MouseLeftClick);
+	io.MouseDown[1] = InputBasic_GetAsBool(ctx->input, ctx->userIdBlock + InputIds::MouseRightClick);
+
+	return io.WantCaptureMouse;
 }
 
 AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheForge_CmdHandle cmd) {
@@ -459,8 +524,10 @@ AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheFo
 		vertexCount += (uint32_t) cmdList->VtxBuffer.Size;
 		indexCount += (uint32_t) cmdList->IdxBuffer.Size;
 
-		if (vertexCount > MAX_VERTEX_COUNT_PER_FRAME) break;
-		if (indexCount > MAX_INDEX_COUNT_PER_FRAME) break;
+		if (vertexCount > MAX_VERTEX_COUNT_PER_FRAME)
+			break;
+		if (indexCount > MAX_INDEX_COUNT_PER_FRAME)
+			break;
 
 		TheForge_UpdateBuffer(&vertexUpdate, true);
 		TheForge_UpdateBuffer(&indexUpdate, true);
@@ -490,10 +557,10 @@ AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheFo
 	TheForge_UpdateBuffer(&constantsUpdate, true);
 
 	TheForge_CmdSetViewport(cmd, 0.0f, 0.0f,
-			drawData->DisplaySize.x, drawData->DisplaySize.y, 0.0f, 1.0f);
+													drawData->DisplaySize.x, drawData->DisplaySize.y, 0.0f, 1.0f);
 	TheForge_CmdSetScissor(cmd,
-			(uint32_t) drawData->DisplayPos.x, (uint32_t) drawData->DisplayPos.y,
-			(uint32_t) drawData->DisplaySize.x,(uint32_t) drawData->DisplaySize.y);
+												 (uint32_t) drawData->DisplayPos.x, (uint32_t) drawData->DisplayPos.y,
+												 (uint32_t) drawData->DisplaySize.x, (uint32_t) drawData->DisplaySize.y);
 	TheForge_CmdBindPipeline(cmd, ctx->pipeline);
 
 	TheForge_CmdBindIndexBuffer(cmd, ctx->indexBuffer, baseIndexOffset);
@@ -523,10 +590,10 @@ AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheFo
 															 (uint32_t) (imcmd->ClipRect.z - imcmd->ClipRect.x),
 															 (uint32_t) (imcmd->ClipRect.w - imcmd->ClipRect.y));
 
-//				TheForge_DescriptorData params[1] = {};
-//				params[0].pName = "uTex";
-//				params[0].pTextures = imcmd->TextureId ? &ctx->fontTexture : nullptr;
-//				TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
+				TheForge_DescriptorData params[1] = {};
+				params[0].pName = "colourTexture";
+				params[0].pTextures = imcmd->TextureId ? (TheForge_TextureHandle *) &imcmd->TextureId : nullptr;
+				TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
 				TheForge_CmdDrawIndexed(cmd, imcmd->ElemCount, idx_offset, vtx_offset);
 			}
