@@ -34,13 +34,14 @@ struct ImguiBindings_Context {
 	TheForge_BufferHandle vertexBuffer;
 	TheForge_BufferHandle indexBuffer;
 	TheForge_BufferHandle uniformBuffer;
-	TheForge_TextureHandle fontTexture;
+
+	ImguiBindings_Texture fontTexture;
+
+	float scaleOffsetMatrix[16];
 
 	ImGuiContext *context;
 };
 
-static const uint64_t MAX_VERTEX_COUNT_PER_FRAME = 1024 * 64;
-static const uint64_t MAX_INDEX_COUNT_PER_FRAME = 128 * 1024;
 static const uint64_t UNIFORM_BUFFER_SIZE_PER_FRAME = 256;
 
 static bool CreateShaders(ImguiBindings_Context *ctx) {
@@ -93,23 +94,6 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 	if (!ffile) {
 		VFile_Close(vfile);
 		return false;
-	}
-
-	{
-		ShaderCompiler_Output vout;
-		bool vokay = ShaderCompiler_CompileShader(
-				ShaderCompiler_LANG_HLSL,
-				ShaderCompiler_ST_VertexShader,
-				"ImguiBindings_VertexShader", vertEntryPoint, vfile,
-				ShaderCompiler_OPT_None,
-				ShaderCompiler_OT_MSL_OSX,
-				10,
-				&vout);
-		if (vout.log != nullptr) {
-			LOGWARNINGF("Shader compiler : %s %s", vokay ? "warnings" : "ERROR", vout.log);
-		}
-		LOGINFO((char *) vout.shader);
-
 	}
 
 	ShaderCompiler_Output vout;
@@ -175,6 +159,7 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 	ImGuiIO &io = ImGui::GetIO();
 	io.Fonts->AddFontDefault();
 	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+	ctx->fontTexture.cpu = Image_CreateHeaderOnly(width, height, 1, 1, ImageFormat_R8_UNORM);
 
 	TheForge_RawImageData rawData{
 			pixels,
@@ -188,20 +173,23 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 
 	TheForge_TextureLoadDesc loadDesc{};
 	loadDesc.pRawImageData = &rawData;
-	loadDesc.pTexture = &ctx->fontTexture;
+	loadDesc.pTexture = &ctx->fontTexture.gpu;
 	loadDesc.mCreationFlag = TheForge_TCF_OWN_MEMORY_BIT;
 	TheForge_LoadTexture(&loadDesc, false);
-	if (!ctx->fontTexture)
+	if (!ctx->fontTexture.gpu)
 		return false;
 
-	ImGui::GetIO().Fonts->TexID = (void *) ctx->fontTexture;
+	ImGui::GetIO().Fonts->TexID = (void *) &ctx->fontTexture;
 
 	return true;
 }
 
 static void DestroyRenderThings(ImguiBindings_Context *ctx) {
-	if (ctx->fontTexture)
-		TheForge_RemoveTexture(ctx->renderer, ctx->fontTexture);
+	if (ctx->fontTexture.gpu)
+		TheForge_RemoveTexture(ctx->renderer, ctx->fontTexture.gpu);
+	if (ctx->fontTexture.cpu)
+		Image_Destroy(ctx->fontTexture.cpu);
+
 	if (ctx->uniformBuffer)
 		TheForge_RemoveBuffer(ctx->renderer, ctx->uniformBuffer);
 	if (ctx->vertexBuffer)
@@ -276,7 +264,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			true,
 	};
 	static TheForge_BufferDesc const vbDesc{
-			MAX_VERTEX_COUNT_PER_FRAME * sizeof(ImDrawVert) * ctx->maxFrames,
+			ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME * sizeof(ImDrawVert) * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
 			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT | TheForge_BCF_OWN_MEMORY_BIT),
 			TheForge_RS_UNDEFINED,
@@ -290,7 +278,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			TheForge_DESCRIPTOR_TYPE_VERTEX_BUFFER,
 	};
 	static TheForge_BufferDesc const ibDesc{
-			MAX_INDEX_COUNT_PER_FRAME * sizeof(ImDrawIdx) * ctx->maxFrames,
+			ImguiBindings_MAX_INDEX_COUNT_PER_FRAME * sizeof(ImDrawIdx) * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
 			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT | TheForge_BCF_OWN_MEMORY_BIT),
 			TheForge_RS_UNDEFINED,
@@ -366,11 +354,11 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	if (!ctx->pipeline)
 		return false;
 
-	TheForge_DescriptorBinderDesc descriptorBinderDesc = {
-			ctx->rootSignature,
-			ctx->maxDynamicUIUpdatesPerBatch
+	TheForge_DescriptorBinderDesc descriptorBinderDesc[] = {
+			{ctx->rootSignature, ctx->maxDynamicUIUpdatesPerBatch},
+			{ctx->rootSignature, ctx->maxDynamicUIUpdatesPerBatch},
 	};
-	TheForge_AddDescriptorBinder(ctx->renderer, 0, 1, &descriptorBinderDesc, &ctx->descriptorBinder);
+	TheForge_AddDescriptorBinder(ctx->renderer, 0, 2, descriptorBinderDesc, &ctx->descriptorBinder);
 	if (!ctx->descriptorBinder)
 		return false;
 
@@ -380,7 +368,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	TheForge_AddBuffer(ctx->renderer, &ibDesc, &ctx->indexBuffer);
 	if (!ctx->indexBuffer)
 		return false;
-	TheForge_AddBuffer(ctx->renderer, &ibDesc, &ctx->uniformBuffer);
+	TheForge_AddBuffer(ctx->renderer, &ubDesc, &ctx->uniformBuffer);
 	if (!ctx->uniformBuffer)
 		return false;
 
@@ -424,6 +412,9 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 		ImguiBindings_Destroy(ctx);
 		return nullptr;
 	}
+
+	ImGuiIO &io = ImGui::GetIO();
+	io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
 	ctx->userIdBlock = InputBasic_AllocateUserIdBlock(input);
 	if (InputBasic_GetMouseCount(input) > 0) {
@@ -488,16 +479,16 @@ AL2O3_EXTERN_C bool ImguiBindings_UpdateInput(ImguiBindings_ContextHandle handle
 	return io.WantCaptureMouse;
 }
 
-AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheForge_CmdHandle cmd) {
+AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle, TheForge_CmdHandle cmd) {
 	auto ctx = (ImguiBindings_Context *) handle;
 	if (!ctx)
-		return;
+		return 0;
 
 	ImDrawData *drawData = ImGui::GetDrawData();
 
 	// Copy and convert all vertices into a single contiguous buffer
-	uint64_t const baseVertexOffset = ctx->currentFrame * MAX_VERTEX_COUNT_PER_FRAME;
-	uint64_t const baseIndexOffset = ctx->currentFrame * MAX_INDEX_COUNT_PER_FRAME;
+	uint64_t const baseVertexOffset = ctx->currentFrame * ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME;
+	uint64_t const baseIndexOffset = ctx->currentFrame * ImguiBindings_MAX_INDEX_COUNT_PER_FRAME;
 	uint64_t const baseUniformOffset = ctx->currentFrame * UNIFORM_BUFFER_SIZE_PER_FRAME;
 
 	uint32_t vertexCount = 0;
@@ -524,14 +515,23 @@ AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheFo
 		vertexCount += (uint32_t) cmdList->VtxBuffer.Size;
 		indexCount += (uint32_t) cmdList->IdxBuffer.Size;
 
-		if (vertexCount > MAX_VERTEX_COUNT_PER_FRAME)
+		if (vertexCount > ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME)
 			break;
-		if (indexCount > MAX_INDEX_COUNT_PER_FRAME)
+		if (indexCount > ImguiBindings_MAX_INDEX_COUNT_PER_FRAME)
 			break;
 
 		TheForge_UpdateBuffer(&vertexUpdate, true);
 		TheForge_UpdateBuffer(&indexUpdate, true);
 	}
+
+	TheForge_BufferBarrier barriers[] = {
+			{ctx->vertexBuffer, TheForge_RS_VERTEX_AND_CONSTANT_BUFFER},
+			{ctx->indexBuffer, TheForge_RS_INDEX_BUFFER},
+	};
+
+	TheForge_CmdResourceBarrier(cmd, 2, barriers,
+															0, nullptr,
+															true);
 
 	float const left = drawData->DisplayPos.x;
 	float const right = drawData->DisplayPos.x + drawData->DisplaySize.x;
@@ -541,18 +541,21 @@ AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheFo
 	float const height = top - bottom;
 	float const offX = (right + left) / (left - right);
 	float const offY = (top + bottom) / (bottom - top);
-	float transform[4][4] = {
-			{2.0f / width, 0.0f, 0.0f, 0.0f},
-			{0.0f, 2.0f / height, 0.0f, 0.0f},
-			{0.0f, 0.0f, 0.5f, 0.0f},
-			{offX, offY, 0.5f, 1.0f},
+
+	float const tmp[16]{
+			2.0f / width, 0.0f, 0.0f, 0.0f,
+			0.0f, 2.0f / height, 0.0f, 0.0f,
+			0.0f, 0.0f, 0.5f, 0.0f,
+			offX, offY, 0.5f, 1.0f,
 	};
+	memcpy(ctx->scaleOffsetMatrix, tmp, sizeof(float) * 16);
+
 	TheForge_BufferUpdateDesc const constantsUpdate{
 			ctx->uniformBuffer,
-			transform,
+			ctx->scaleOffsetMatrix,
 			0,
 			baseUniformOffset,
-			sizeof(transform)
+			sizeof(float) * 16
 	};
 	TheForge_UpdateBuffer(&constantsUpdate, true);
 
@@ -573,35 +576,78 @@ AL2O3_EXTERN_C void ImguiBindings_Draw(ImguiBindings_ContextHandle handle, TheFo
 
 	TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
-	int vtx_offset = 0;
-	int idx_offset = 0;
 	ImVec2 pos = drawData->DisplayPos;
+
+	int lastVertexOffset = 0;
+	int lastIndexOffset = 0;
+
 	for (int n = 0; n < drawData->CmdListsCount; n++) {
 		const ImDrawList *cmdList = drawData->CmdLists[n];
+
 		for (int cmd_i = 0; cmd_i < cmdList->CmdBuffer.size(); cmd_i++) {
 			const ImDrawCmd *imcmd = &cmdList->CmdBuffer[cmd_i];
 			if (imcmd->UserCallback) {
 				// User callback (registered via ImDrawList::AddCallback)
-				imcmd->UserCallback(cmdList, imcmd);
+
+				// adjust the vertex and index offsets
+				ImDrawCmd tmp;
+				memcpy(&tmp, imcmd, sizeof(ImDrawCmd));
+				tmp.IdxOffset = lastIndexOffset + imcmd->IdxOffset,
+				tmp.VtxOffset = lastVertexOffset + imcmd->VtxOffset;
+
+				imcmd->UserCallback(cmdList, &tmp);
+
 			} else {
+
 				TheForge_CmdSetScissor(cmd,
 															 (uint32_t) (imcmd->ClipRect.x - pos.x),
 															 (uint32_t) (imcmd->ClipRect.y - pos.y),
 															 (uint32_t) (imcmd->ClipRect.z - imcmd->ClipRect.x),
 															 (uint32_t) (imcmd->ClipRect.w - imcmd->ClipRect.y));
 
+				ImguiBindings_Texture const
+						*texture = imcmd->TextureId ? (ImguiBindings_Texture const *) imcmd->TextureId : nullptr;
 				TheForge_DescriptorData params[1] = {};
 				params[0].pName = "colourTexture";
-				params[0].pTextures = imcmd->TextureId ? (TheForge_TextureHandle *) &imcmd->TextureId : nullptr;
+				params[0].pTextures = &(texture->gpu);
 				TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
-				TheForge_CmdDrawIndexed(cmd, imcmd->ElemCount, idx_offset, vtx_offset);
+				TheForge_CmdDrawIndexed(cmd, imcmd->ElemCount,
+																lastIndexOffset + imcmd->IdxOffset,
+																lastVertexOffset + imcmd->VtxOffset);
 			}
-			idx_offset += imcmd->ElemCount;
 		}
-		vtx_offset += (int) cmdList->VtxBuffer.size();
+		lastIndexOffset += cmdList->IdxBuffer.Size;
+		lastVertexOffset += cmdList->VtxBuffer.Size;
 	}
+	uint32_t frameWeWroteTo = ctx->currentFrame;
 
 	// where we will write next frame data, which was last used N frame ago
 	ctx->currentFrame = (ctx->currentFrame + 1) % ctx->maxFrames;
+	return frameWeWroteTo;
+}
+
+AL2O3_EXTERN_C float const *ImguiBindings_GetScaleOffsetMatrix(ImguiBindings_ContextHandle handle) {
+	auto ctx = (ImguiBindings_Context *) handle;
+	if (!ctx)
+		return nullptr;
+
+	return ctx->scaleOffsetMatrix;
+
+}
+
+AL2O3_EXTERN_C TheForge_BufferHandle ImguiBindings_GetVertexBuffer(ImguiBindings_ContextHandle handle) {
+	auto ctx = (ImguiBindings_Context *) handle;
+	if (!ctx)
+		return nullptr;
+
+	return ctx->vertexBuffer;
+}
+
+AL2O3_EXTERN_C TheForge_BufferHandle ImguiBindings_GetIndexBuffer(ImguiBindings_ContextHandle handle) {
+	auto ctx = (ImguiBindings_Context *) handle;
+	if (!ctx)
+		return nullptr;
+
+	return ctx->indexBuffer;
 }
