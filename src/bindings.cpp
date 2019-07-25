@@ -159,7 +159,7 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 	ImGuiIO &io = ImGui::GetIO();
 	io.Fonts->AddFontDefault();
 	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-	ctx->fontTexture.cpu = Image_CreateHeaderOnly(width, height, 1, 1, ImageFormat_R8_UNORM);
+	ctx->fontTexture.cpu = Image_CreateHeaderOnly(width, height, 1, 1, TinyImageFormat_R8_UNORM);
 
 	TheForge_RawImageData rawData{
 			pixels,
