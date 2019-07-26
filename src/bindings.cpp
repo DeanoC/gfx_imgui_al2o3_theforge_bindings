@@ -571,16 +571,11 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 													drawData->DisplaySize.x * drawData->FramebufferScale.x,
 													drawData->DisplaySize.y  * drawData->FramebufferScale.y,
 													0.0f, 1.0f);
-	TheForge_CmdBindPipeline(cmd, ctx->pipeline);
-
-	TheForge_CmdBindIndexBuffer(cmd, ctx->indexBuffer, baseIndexOffset);
-	TheForge_CmdBindVertexBuffer(cmd, 1, &ctx->vertexBuffer, &baseVertexOffset);
 
 	TheForge_DescriptorData params[1] = {};
 	params[0].pName = "uniformBlockVS";
 	params[0].pBuffers = &ctx->uniformBuffer;
 	params[0].pOffsets = &baseUniformOffset;
-
 	TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
 	ImVec2 pos = drawData->DisplayPos;
@@ -590,12 +585,19 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 	int lastVertexOffset = 0;
 	int lastIndexOffset = 0;
 
+	bool resetPipeline = true;
+	ImguiBindings_Texture const* lastTexture = nullptr;
+
 	for (int n = 0; n < drawData->CmdListsCount; n++) {
 		const ImDrawList *cmdList = drawData->CmdLists[n];
 
 		for (int cmd_i = 0; cmd_i < cmdList->CmdBuffer.size(); cmd_i++) {
 			const ImDrawCmd *imcmd = &cmdList->CmdBuffer[cmd_i];
 			if (imcmd->UserCallback) {
+				if(imcmd->UserCallback == ImDrawCallback_ResetRenderState) {
+					resetPipeline = true;
+				}
+
 				// User callback (registered via ImDrawList::AddCallback)
 
 				// adjust the vertex and index offsets
@@ -605,7 +607,17 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 				tmp.VtxOffset = lastVertexOffset + imcmd->VtxOffset;
 				imcmd->UserCallback(cmdList, &tmp);
 
+				resetPipeline = true;
 			} else {
+				if(resetPipeline) {
+					TheForge_CmdBindPipeline(cmd, ctx->pipeline);
+
+					TheForge_CmdBindIndexBuffer(cmd, ctx->indexBuffer, baseIndexOffset);
+					TheForge_CmdBindVertexBuffer(cmd, 1, &ctx->vertexBuffer, &baseVertexOffset);
+
+					resetPipeline = false;
+					lastTexture = nullptr;
+				}
 				float const clipX = imcmd->ClipRect.x * drawData->FramebufferScale.x;
 				float const clipY = imcmd->ClipRect.y * drawData->FramebufferScale.y;
 				float const clipZ = imcmd->ClipRect.z * drawData->FramebufferScale.x;
@@ -619,10 +631,14 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 
 				ImguiBindings_Texture const
 						*texture = imcmd->TextureId ? (ImguiBindings_Texture const *) imcmd->TextureId : nullptr;
-				TheForge_DescriptorData params[1] = {};
-				params[0].pName = "colourTexture";
-				params[0].pTextures = &(texture->gpu);
-				TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
+
+				if(texture != lastTexture) {
+					TheForge_DescriptorData params[1] = {};
+					params[0].pName = "colourTexture";
+					params[0].pTextures = &(texture->gpu);
+					TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
+					lastTexture = texture;
+				}
 
 				TheForge_CmdDrawIndexed(cmd, imcmd->ElemCount,
 																lastIndexOffset + imcmd->IdxOffset,
