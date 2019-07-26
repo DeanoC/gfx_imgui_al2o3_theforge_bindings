@@ -280,7 +280,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	static TheForge_BufferDesc const ibDesc{
 			ImguiBindings_MAX_INDEX_COUNT_PER_FRAME * sizeof(ImDrawIdx) * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
-			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT | TheForge_BCF_OWN_MEMORY_BIT),
+			TheForge_BCF_NONE, //(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT | TheForge_BCF_OWN_MEMORY_BIT),
 			TheForge_RS_UNDEFINED,
 			TheForge_IT_UINT16,
 			0,
@@ -295,7 +295,9 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	static TheForge_BufferDesc const ubDesc{
 			UNIFORM_BUFFER_SIZE_PER_FRAME * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
-			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT | TheForge_BCF_OWN_MEMORY_BIT),
+			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT |
+																			TheForge_BCF_NO_DESCRIPTOR_VIEW_CREATION |
+																			TheForge_BCF_OWN_MEMORY_BIT),
 			TheForge_RS_UNDEFINED,
 			TheForge_IT_UINT16,
 			0,
@@ -520,8 +522,8 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 		if (indexCount > ImguiBindings_MAX_INDEX_COUNT_PER_FRAME)
 			break;
 
-		TheForge_UpdateBuffer(&vertexUpdate, true);
-		TheForge_UpdateBuffer(&indexUpdate, true);
+		TheForge_UpdateBuffer(&vertexUpdate, false);
+		TheForge_UpdateBuffer(&indexUpdate, false);
 	}
 
 	TheForge_BufferBarrier barriers[] = {
@@ -531,7 +533,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 
 	TheForge_CmdResourceBarrier(cmd, 2, barriers,
 															0, nullptr,
-															true);
+															false);
 
 	float const left = drawData->DisplayPos.x;
 	float const right = drawData->DisplayPos.x + drawData->DisplaySize.x;
@@ -557,7 +559,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 			baseUniformOffset,
 			sizeof(float) * 16
 	};
-	TheForge_UpdateBuffer(&constantsUpdate, true);
+	TheForge_UpdateBuffer(&constantsUpdate, false);
 
 	TheForge_CmdSetViewport(cmd, 0.0f, 0.0f,
 													drawData->DisplaySize.x, drawData->DisplaySize.y, 0.0f, 1.0f);
