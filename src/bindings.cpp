@@ -529,8 +529,8 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 		if (indexCount > ImguiBindings_MAX_INDEX_COUNT_PER_FRAME)
 			break;
 
-		TheForge_UpdateBuffer(&vertexUpdate, false);
-		TheForge_UpdateBuffer(&indexUpdate, false);
+		TheForge_UpdateBuffer(&vertexUpdate, true);
+		TheForge_UpdateBuffer(&indexUpdate, true);
 	}
 
 	TheForge_BufferBarrier barriers[] = {
@@ -540,7 +540,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 
 	TheForge_CmdResourceBarrier(cmd, 2, barriers,
 															0, nullptr,
-															false);
+															true);
 
 	float const left = drawData->DisplayPos.x;
 	float const right = drawData->DisplayPos.x + drawData->DisplaySize.x;
@@ -566,7 +566,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 			baseUniformOffset,
 			sizeof(float) * 16
 	};
-	TheForge_UpdateBuffer(&constantsUpdate, false);
+	TheForge_UpdateBuffer(&constantsUpdate, true);
 
 	TheForge_CmdSetViewport(cmd, 0.0f, 0.0f,
 													drawData->DisplaySize.x * drawData->FramebufferScale.x,
