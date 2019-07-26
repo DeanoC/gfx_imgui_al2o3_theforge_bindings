@@ -253,7 +253,8 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			false, false
 	};
 	static TheForge_DepthStateDesc const depthStateDesc{
-			false, false
+        false, false,
+        TheForge_CMP_ALWAYS,
 	};
 	static TheForge_RasterizerStateDesc const rasterizerStateDesc{
 			TheForge_CM_NONE,
@@ -392,7 +393,7 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 																																uint32_t maxFrames,
 																																TheForge_ImageFormat renderTargetFormat,
 																																TheForge_ImageFormat depthStencilFormat,
-																																bool sRGB,
+																																bool const sRGB,
 																																TheForge_SampleCount sampleCount,
 																																uint32_t sampleQuality) {
 	auto ctx = (ImguiBindings_Context *) MEMORY_CALLOC(1, sizeof(ImguiBindings_Context));
@@ -511,7 +512,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 				cmdList->IdxBuffer.Data,
 				0,
 				baseIndexOffset + (indexCount * sizeof(ImDrawIdx)),
-				cmdList->IdxBuffer.Size * sizeof(ImDrawIdx)
+				(((cmdList->IdxBuffer.Size * sizeof(ImDrawIdx)) + 3u) & ~3u)
 		};
 
 		vertexCount += (uint32_t) cmdList->VtxBuffer.Size;
