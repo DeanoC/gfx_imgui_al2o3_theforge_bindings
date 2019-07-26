@@ -29,7 +29,7 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 																																uint32_t sampleQuality);
 AL2O3_EXTERN_C void ImguiBindings_Destroy(ImguiBindings_ContextHandle handle);
 
-AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle handle, uint32_t width, uint32_t height);
+AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle handle, uint32_t width, uint32_t height, float backingScaleX, float backingScaleY);
 
 AL2O3_EXTERN_C bool ImguiBindings_UpdateInput(ImguiBindings_ContextHandle handle, double deltaTimeInMS);
 

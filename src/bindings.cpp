@@ -457,7 +457,10 @@ AL2O3_EXTERN_C void ImguiBindings_Destroy(ImguiBindings_ContextHandle handle) {
 	MEMORY_FREE(ctx);
 }
 
-AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle handle, uint32_t width, uint32_t height) {
+AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle handle,
+		uint32_t width,
+		uint32_t height,
+		float dpiBackingScaleX,	float dpiBackingScaleY ) {
 	auto ctx = (ImguiBindings_Context *) handle;
 	if (!ctx)
 		return;
@@ -465,6 +468,8 @@ AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle hand
 	ImGuiIO &io = ImGui::GetIO();
 	io.DisplaySize.x = (float) width;
 	io.DisplaySize.y = (float) height;
+	io.DisplayFramebufferScale.x = dpiBackingScaleX;
+	io.DisplayFramebufferScale.y = dpiBackingScaleY;
 }
 
 AL2O3_EXTERN_C bool ImguiBindings_UpdateInput(ImguiBindings_ContextHandle handle, double deltaTimeInMS) {
@@ -540,8 +545,8 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 	float const right = drawData->DisplayPos.x + drawData->DisplaySize.x;
 	float const top = drawData->DisplayPos.y;
 	float const bottom = drawData->DisplayPos.y + drawData->DisplaySize.y;
-	float const width = right - left;
-	float const height = top - bottom;
+	float const width = (right - left);
+	float const height = (top - bottom);
 	float const offX = (right + left) / (left - right);
 	float const offY = (top + bottom) / (bottom - top);
 
@@ -563,10 +568,9 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 	TheForge_UpdateBuffer(&constantsUpdate, false);
 
 	TheForge_CmdSetViewport(cmd, 0.0f, 0.0f,
-													drawData->DisplaySize.x, drawData->DisplaySize.y, 0.0f, 1.0f);
-	TheForge_CmdSetScissor(cmd,
-												 (uint32_t) drawData->DisplayPos.x, (uint32_t) drawData->DisplayPos.y,
-												 (uint32_t) drawData->DisplaySize.x, (uint32_t) drawData->DisplaySize.y);
+													drawData->DisplaySize.x * drawData->FramebufferScale.x,
+													drawData->DisplaySize.y  * drawData->FramebufferScale.y,
+													0.0f, 1.0f);
 	TheForge_CmdBindPipeline(cmd, ctx->pipeline);
 
 	TheForge_CmdBindIndexBuffer(cmd, ctx->indexBuffer, baseIndexOffset);
@@ -580,6 +584,8 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 	TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
 	ImVec2 pos = drawData->DisplayPos;
+	pos[0] *= drawData->FramebufferScale[0];
+	pos[1] *= drawData->FramebufferScale[1];
 
 	int lastVertexOffset = 0;
 	int lastIndexOffset = 0;
@@ -597,16 +603,19 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 				memcpy(&tmp, imcmd, sizeof(ImDrawCmd));
 				tmp.IdxOffset = lastIndexOffset + imcmd->IdxOffset,
 				tmp.VtxOffset = lastVertexOffset + imcmd->VtxOffset;
-
 				imcmd->UserCallback(cmdList, &tmp);
 
 			} else {
+				float const clipX = imcmd->ClipRect.x * drawData->FramebufferScale.x;
+				float const clipY = imcmd->ClipRect.y * drawData->FramebufferScale.y;
+				float const clipZ = imcmd->ClipRect.z * drawData->FramebufferScale.x;
+				float const clipW = imcmd->ClipRect.w * drawData->FramebufferScale.y;
 
 				TheForge_CmdSetScissor(cmd,
-															 (uint32_t) (imcmd->ClipRect.x - pos.x),
-															 (uint32_t) (imcmd->ClipRect.y - pos.y),
-															 (uint32_t) (imcmd->ClipRect.z - imcmd->ClipRect.x),
-															 (uint32_t) (imcmd->ClipRect.w - imcmd->ClipRect.y));
+															 (uint32_t) (clipX - pos.x),
+															 (uint32_t) (clipY - pos.y),
+															 (uint32_t) (clipZ - clipX),
+															 (uint32_t) (clipW - clipY));
 
 				ImguiBindings_Texture const
 						*texture = imcmd->TextureId ? (ImguiBindings_Texture const *) imcmd->TextureId : nullptr;
