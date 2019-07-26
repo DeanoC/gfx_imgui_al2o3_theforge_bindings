@@ -421,22 +421,23 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 
 	ctx->userIdBlock = InputBasic_AllocateUserIdBlock(input);
 	if (InputBasic_GetMouseCount(input) > 0) {
+
 		ctx->mouse = InputBasic_MouseCreate(input, 0);
+		InputBasic_MapToMouseAxis(ctx->input,
+															ctx->userIdBlock + InputIds::MouseX,
+															ctx->mouse, InputBasis_Axis_X);
+
+		InputBasic_MapToMouseAxis(ctx->input,
+															ctx->userIdBlock + InputIds::MouseY,
+															ctx->mouse, InputBasis_Axis_Y);
+		InputBasic_MapToMouseButton(ctx->input,
+																ctx->userIdBlock + InputIds::MouseLeftClick,
+																ctx->mouse, InputBasic_MouseButton_Left);
+
+		InputBasic_MapToMouseButton(ctx->input,
+																ctx->userIdBlock + (uint32_t) InputIds::MouseRightClick,
+																ctx->mouse, InputBasic_MouseButton_Right);
 	}
-	InputBasic_MapToMouseAxis(ctx->input,
-														ctx->userIdBlock + InputIds::MouseX,
-														ctx->mouse, InputBasis_Axis_X);
-
-	InputBasic_MapToMouseAxis(ctx->input,
-														ctx->userIdBlock + InputIds::MouseY,
-														ctx->mouse, InputBasis_Axis_Y);
-	InputBasic_MapToMouseButton(ctx->input,
-															ctx->userIdBlock + InputIds::MouseLeftClick,
-															ctx->mouse, InputBasic_MouseButton_Left);
-
-	InputBasic_MapToMouseButton(ctx->input,
-															ctx->userIdBlock + (uint32_t) InputIds::MouseRightClick,
-															ctx->mouse, InputBasic_MouseButton_Right);
 
 	return ctx;
 }
