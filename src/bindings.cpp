@@ -608,11 +608,11 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 				if(resetPipeline) {
 					TheForge_CmdBindPipeline(cmd, ctx->pipeline);
 
-                    TheForge_DescriptorData params[1] = {};
-                    params[0].pName = "uniformBlockVS";
-                    params[0].pBuffers = &ctx->uniformBuffer;
-                    params[0].pOffsets = &baseUniformOffset;
-                    TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
+					TheForge_DescriptorData params[1] = {};
+					params[0].pName = "uniformBlockVS";
+					params[0].pBuffers = &ctx->uniformBuffer;
+					params[0].pOffsets = &baseUniformOffset;
+					TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
 					TheForge_CmdBindIndexBuffer(cmd, ctx->indexBuffer, baseIndexOffset);
 					TheForge_CmdBindVertexBuffer(cmd, 1, &ctx->vertexBuffer, &baseVertexOffset);
