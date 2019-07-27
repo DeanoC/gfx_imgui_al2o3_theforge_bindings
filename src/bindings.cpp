@@ -573,11 +573,6 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 													drawData->DisplaySize.y  * drawData->FramebufferScale.y,
 													0.0f, 1.0f);
 
-	TheForge_DescriptorData params[1] = {};
-	params[0].pName = "uniformBlockVS";
-	params[0].pBuffers = &ctx->uniformBuffer;
-	params[0].pOffsets = &baseUniformOffset;
-	TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
 	ImVec2 pos = drawData->DisplayPos;
 	pos[0] *= drawData->FramebufferScale[0];
@@ -612,6 +607,12 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 			} else {
 				if(resetPipeline) {
 					TheForge_CmdBindPipeline(cmd, ctx->pipeline);
+
+                    TheForge_DescriptorData params[1] = {};
+                    params[0].pName = "uniformBlockVS";
+                    params[0].pBuffers = &ctx->uniformBuffer;
+                    params[0].pOffsets = &baseUniformOffset;
+                    TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
 					TheForge_CmdBindIndexBuffer(cmd, ctx->indexBuffer, baseIndexOffset);
 					TheForge_CmdBindVertexBuffer(cmd, 1, &ctx->vertexBuffer, &baseVertexOffset);
