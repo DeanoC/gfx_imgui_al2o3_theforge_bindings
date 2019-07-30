@@ -45,7 +45,7 @@ struct ImguiBindings_Context {
 static const uint64_t UNIFORM_BUFFER_SIZE_PER_FRAME = 256;
 
 static bool CreateShaders(ImguiBindings_Context *ctx) {
-	static char const *const VertexShader = "cbuffer uniformBlockVS : register(b0)\n"
+	static char const *const VertexShader = "cbuffer uniformBlockVS : register(b0, space0)\n"
 																					"{\n"
 																					"\tfloat4x4 ProjectionMatrix;\n"
 																					"};\n"
@@ -77,8 +77,8 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 																						"\tfloat4 Colour   : COLOR;\n"
 																						"};\n"
 																						"\n"
-																						"Texture2D colourTexture : register(t1);\n"
-																						"SamplerState bilinearSampler : register(s1);\n"
+																						"Texture2D colourTexture : register(t1, space1);\n"
+																						"SamplerState bilinearSampler : register(s1, space2);\n"
 																						"float4 FS_main(FSInput input) : SV_Target\n"
 																						"{\n"
 																						"\treturn input.Colour * colourTexture.Sample(bilinearSampler, input.Uv);\n"
@@ -566,7 +566,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 			baseUniformOffset,
 			sizeof(float) * 16
 	};
-	TheForge_UpdateBuffer(&constantsUpdate, true);
+	TheForge_UpdateBuffer(&constantsUpdate, false);
 
 	TheForge_CmdSetViewport(cmd, 0.0f, 0.0f,
 													drawData->DisplaySize.x * drawData->FramebufferScale.x,
@@ -612,6 +612,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 					params[0].pName = "uniformBlockVS";
 					params[0].pBuffers = &ctx->uniformBuffer;
 					params[0].pOffsets = &baseUniformOffset;
+					params[0].count = 1;
 					TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
 
 					TheForge_CmdBindIndexBuffer(cmd, ctx->indexBuffer, baseIndexOffset);
@@ -635,10 +636,15 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 						*texture = imcmd->TextureId ? (ImguiBindings_Texture const *) imcmd->TextureId : nullptr;
 
 				if(texture != lastTexture) {
-					TheForge_DescriptorData params[1] = {};
-					params[0].pName = "colourTexture";
-					params[0].pTextures = &(texture->gpu);
-					TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 1, params);
+					TheForge_DescriptorData params[2] = {};
+					params[0].pName = "uniformBlockVS";
+					params[0].pBuffers = &ctx->uniformBuffer;
+					params[0].pOffsets = &baseUniformOffset;
+					params[0].count = 1;
+					params[1].pName = "colourTexture";
+					params[1].pTextures = &(texture->gpu);
+					params[1].count = 1;
+					TheForge_CmdBindDescriptors(cmd, ctx->descriptorBinder, ctx->rootSignature, 2, params);
 					lastTexture = texture;
 				}
 
