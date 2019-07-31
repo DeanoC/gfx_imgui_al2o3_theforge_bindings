@@ -174,7 +174,7 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 	TheForge_TextureLoadDesc loadDesc{};
 	loadDesc.pRawImageData = &rawData;
 	loadDesc.pTexture = &ctx->fontTexture.gpu;
-	loadDesc.mCreationFlag = TheForge_TCF_OWN_MEMORY_BIT;
+	loadDesc.mCreationFlag = TheForge_TCF_NONE;
 	TheForge_LoadTexture(&loadDesc, false);
 	if (!ctx->fontTexture.gpu)
 		return false;
@@ -182,36 +182,6 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 	ImGui::GetIO().Fonts->TexID = (void *) &ctx->fontTexture;
 
 	return true;
-}
-
-static void DestroyRenderThings(ImguiBindings_Context *ctx) {
-	if (ctx->fontTexture.gpu)
-		TheForge_RemoveTexture(ctx->renderer, ctx->fontTexture.gpu);
-	if (ctx->fontTexture.cpu)
-		Image_Destroy(ctx->fontTexture.cpu);
-
-	if (ctx->uniformBuffer)
-		TheForge_RemoveBuffer(ctx->renderer, ctx->uniformBuffer);
-	if (ctx->vertexBuffer)
-		TheForge_RemoveBuffer(ctx->renderer, ctx->vertexBuffer);
-	if (ctx->indexBuffer)
-		TheForge_RemoveBuffer(ctx->renderer, ctx->indexBuffer);
-	if (ctx->descriptorBinder)
-		TheForge_RemoveDescriptorBinder(ctx->renderer, ctx->descriptorBinder);
-	if (ctx->pipeline)
-		TheForge_RemovePipeline(ctx->renderer, ctx->pipeline);
-	if (ctx->rootSignature)
-		TheForge_RemoveRootSignature(ctx->renderer, ctx->rootSignature);
-	if (ctx->rasterizationState)
-		TheForge_RemoveRasterizerState(ctx->renderer, ctx->rasterizationState);
-	if (ctx->depthState)
-		TheForge_RemoveDepthState(ctx->renderer, ctx->depthState);
-	if (ctx->blendState)
-		TheForge_RemoveBlendState(ctx->renderer, ctx->blendState);
-	if (ctx->bilinearSampler)
-		TheForge_RemoveSampler(ctx->renderer, ctx->bilinearSampler);
-	if (ctx->shader)
-		TheForge_RemoveShader(ctx->renderer, ctx->shader);
 }
 
 static bool CreateRenderThings(ImguiBindings_Context *ctx,
@@ -267,7 +237,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	static TheForge_BufferDesc const vbDesc{
 			ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME * sizeof(ImDrawVert) * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
-			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT | TheForge_BCF_OWN_MEMORY_BIT),
+			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT),
 			TheForge_RS_UNDEFINED,
 			TheForge_IT_UINT16,
 			sizeof(ImDrawVert),
@@ -281,7 +251,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	static TheForge_BufferDesc const ibDesc{
 			ImguiBindings_MAX_INDEX_COUNT_PER_FRAME * sizeof(ImDrawIdx) * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
-			TheForge_BCF_NONE, //(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT | TheForge_BCF_OWN_MEMORY_BIT),
+			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT),
 			TheForge_RS_UNDEFINED,
 			TheForge_IT_UINT16,
 			0,
@@ -297,8 +267,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			UNIFORM_BUFFER_SIZE_PER_FRAME * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
 			(TheForge_BufferCreationFlags) (TheForge_BCF_PERSISTENT_MAP_BIT |
-																			TheForge_BCF_NO_DESCRIPTOR_VIEW_CREATION |
-																			TheForge_BCF_OWN_MEMORY_BIT),
+																			TheForge_BCF_NO_DESCRIPTOR_VIEW_CREATION),
 			TheForge_RS_UNDEFINED,
 			TheForge_IT_UINT16,
 			0,
@@ -326,7 +295,6 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	TheForge_ShaderHandle shaders[]{ctx->shader};
 	TheForge_SamplerHandle samplers[]{ctx->bilinearSampler};
 	char const *staticSamplerNames[]{"bilinearSampler"};
-
 	TheForge_RootSignatureDesc rootSignatureDesc{};
 	rootSignatureDesc.shaderCount = 1;
 	rootSignatureDesc.pShaders = shaders;
@@ -377,6 +345,37 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 
 	return true;
 }
+
+static void DestroyRenderThings(ImguiBindings_Context *ctx) {
+	if (ctx->fontTexture.gpu)
+		TheForge_RemoveTexture(ctx->renderer, ctx->fontTexture.gpu);
+	if (ctx->fontTexture.cpu)
+		Image_Destroy(ctx->fontTexture.cpu);
+
+	if (ctx->uniformBuffer)
+		TheForge_RemoveBuffer(ctx->renderer, ctx->uniformBuffer);
+	if (ctx->vertexBuffer)
+		TheForge_RemoveBuffer(ctx->renderer, ctx->vertexBuffer);
+	if (ctx->indexBuffer)
+		TheForge_RemoveBuffer(ctx->renderer, ctx->indexBuffer);
+	if (ctx->descriptorBinder)
+		TheForge_RemoveDescriptorBinder(ctx->renderer, ctx->descriptorBinder);
+	if (ctx->pipeline)
+		TheForge_RemovePipeline(ctx->renderer, ctx->pipeline);
+	if (ctx->rootSignature)
+		TheForge_RemoveRootSignature(ctx->renderer, ctx->rootSignature);
+	if (ctx->rasterizationState)
+		TheForge_RemoveRasterizerState(ctx->renderer, ctx->rasterizationState);
+	if (ctx->depthState)
+		TheForge_RemoveDepthState(ctx->renderer, ctx->depthState);
+	if (ctx->blendState)
+		TheForge_RemoveBlendState(ctx->renderer, ctx->blendState);
+	if (ctx->bilinearSampler)
+		TheForge_RemoveSampler(ctx->renderer, ctx->bilinearSampler);
+	if (ctx->shader)
+		TheForge_RemoveShader(ctx->renderer, ctx->shader);
+}
+
 
 static void *alloc_func(size_t sz, void *user_data) {
 	return MEMORY_MALLOC(sz);
