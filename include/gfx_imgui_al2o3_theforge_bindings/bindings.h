@@ -22,9 +22,8 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 																																InputBasic_ContextHandle input,
 																																uint32_t maxDynamicUIUpdatesPerBatch,
 																																uint32_t maxFrames,
-																																TheForge_ImageFormat renderTargetFormat,
-																																TheForge_ImageFormat depthStencilFormat,
-																																bool sRGB,
+																																TinyImageFormat renderTargetFormat,
+																																TinyImageFormat depthStencilFormat,
 																																TheForge_SampleCount sampleCount,
 																																uint32_t sampleQuality);
 AL2O3_EXTERN_C void ImguiBindings_Destroy(ImguiBindings_ContextHandle handle);

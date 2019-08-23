@@ -159,11 +159,11 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 	ImGuiIO &io = ImGui::GetIO();
 	io.Fonts->AddFontDefault();
 	io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-	ctx->fontTexture.cpu = Image_CreateHeaderOnly(width, height, 1, 1, TinyImageFormat_R8_UNORM);
+	ctx->fontTexture.cpu = Image_CreateHeaderOnly(width, height, 1, 1, TinyImageFormat_R8G8B8A8_UNORM);
 
 	TheForge_RawImageData rawData{
 			pixels,
-			TheForge_IF_RGBA8,
+			TinyImageFormat_R8G8B8A8_UNORM,
 			(uint32_t) width,
 			(uint32_t) height,
 			1,
@@ -185,9 +185,8 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 }
 
 static bool CreateRenderThings(ImguiBindings_Context *ctx,
-															 TheForge_ImageFormat renderTargetFormat,
-															 TheForge_ImageFormat depthStencilFormat,
-															 bool sRGB,
+															 TinyImageFormat renderTargetFormat,
+															 TinyImageFormat depthStencilFormat,
 															 TheForge_SampleCount sampleCount,
 															 uint32_t sampleQuality) {
 	if (!CreateShaders(ctx))
@@ -206,9 +205,9 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	static TheForge_VertexLayout const vertexLayout{
 			3,
 			{
-					{TheForge_SS_POSITION, 8, "POSITION", TheForge_IF_RG32F, 0, 0, 0},
-					{TheForge_SS_TEXCOORD0, 9, "TEXCOORD", TheForge_IF_RG32F, 0, 1, sizeof(float) * 2},
-					{TheForge_SS_COLOR, 5, "COLOR", TheForge_IF_RGBA8, 0, 2, sizeof(float) * 4}
+					{TheForge_SS_POSITION, 8, "POSITION", TinyImageFormat_R32G32_SFLOAT, 0, 0, 0},
+					{TheForge_SS_TEXCOORD0, 9, "TEXCOORD",TinyImageFormat_R32G32_SFLOAT, 0, 1, sizeof(float) * 2},
+					{TheForge_SS_COLOR, 5, "COLOR", TinyImageFormat_R8G8B8A8_UNORM, 0, 2, sizeof(float) * 4}
 			}
 	};
 	static TheForge_BlendStateDesc const blendDesc{
@@ -245,7 +244,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			0,
 			0,
 			nullptr,
-			TheForge_IF_NONE,
+			TinyImageFormat_UNDEFINED,
 			TheForge_DESCRIPTOR_TYPE_VERTEX_BUFFER,
 	};
 	static TheForge_BufferDesc const ibDesc{
@@ -259,7 +258,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			0,
 			0,
 			nullptr,
-			TheForge_IF_NONE,
+			TinyImageFormat_UNDEFINED,
 			TheForge_DESCRIPTOR_TYPE_INDEX_BUFFER,
 	};
 
@@ -275,7 +274,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			0,
 			0,
 			nullptr,
-			TheForge_IF_NONE,
+			TinyImageFormat_UNDEFINED,
 			TheForge_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 	};
 
@@ -317,7 +316,6 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	gfxPipeDesc.renderTargetCount = 1;
 	gfxPipeDesc.pColorFormats = &renderTargetFormat;
 	gfxPipeDesc.depthStencilFormat = depthStencilFormat;
-	gfxPipeDesc.pSrgbValues = &sRGB;
 	gfxPipeDesc.sampleCount = sampleCount;
 	gfxPipeDesc.sampleQuality = sampleQuality;
 	gfxPipeDesc.primitiveTopo = TheForge_PT_TRI_LIST;
@@ -390,9 +388,8 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 																																InputBasic_ContextHandle input,
 																																uint32_t maxDynamicUIUpdatesPerBatch,
 																																uint32_t maxFrames,
-																																TheForge_ImageFormat renderTargetFormat,
-																																TheForge_ImageFormat depthStencilFormat,
-																																bool const sRGB,
+																																TinyImageFormat renderTargetFormat,
+																																TinyImageFormat depthStencilFormat,
 																																TheForge_SampleCount sampleCount,
 																																uint32_t sampleQuality) {
 	auto ctx = (ImguiBindings_Context *) MEMORY_CALLOC(1, sizeof(ImguiBindings_Context));
@@ -410,7 +407,7 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 	ImGui::SetCurrentContext(ctx->context);
 
 	if (!CreateRenderThings(ctx,
-													renderTargetFormat, depthStencilFormat, sRGB, sampleCount, sampleQuality)) {
+													renderTargetFormat, depthStencilFormat, sampleCount, sampleQuality)) {
 		ImguiBindings_Destroy(ctx);
 		return nullptr;
 	}
