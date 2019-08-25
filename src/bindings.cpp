@@ -667,19 +667,3 @@ AL2O3_EXTERN_C float const *ImguiBindings_GetScaleOffsetMatrix(ImguiBindings_Con
 	return ctx->scaleOffsetMatrix;
 
 }
-
-AL2O3_EXTERN_C TheForge_BufferHandle ImguiBindings_GetVertexBuffer(ImguiBindings_ContextHandle handle) {
-	auto ctx = (ImguiBindings_Context *) handle;
-	if (!ctx)
-		return nullptr;
-
-	return ctx->vertexBuffer;
-}
-
-AL2O3_EXTERN_C TheForge_BufferHandle ImguiBindings_GetIndexBuffer(ImguiBindings_ContextHandle handle) {
-	auto ctx = (ImguiBindings_Context *) handle;
-	if (!ctx)
-		return nullptr;
-
-	return ctx->indexBuffer;
-}

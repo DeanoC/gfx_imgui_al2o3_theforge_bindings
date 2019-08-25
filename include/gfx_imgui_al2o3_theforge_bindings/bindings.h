@@ -35,9 +35,6 @@ AL2O3_EXTERN_C bool ImguiBindings_UpdateInput(ImguiBindings_ContextHandle handle
 // returns the frame it just wrote data into, can be ignored except for custom rendering
 AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle, TheForge_CmdHandle cmd);
 
-// for custom rendering of imgui stuff (the buffeer has all frames in it, so you need to account for the offset)
 AL2O3_EXTERN_C float const* ImguiBindings_GetScaleOffsetMatrix(ImguiBindings_ContextHandle handle);
-AL2O3_EXTERN_C TheForge_BufferHandle ImguiBindings_GetVertexBuffer(ImguiBindings_ContextHandle handle);
-AL2O3_EXTERN_C TheForge_BufferHandle ImguiBindings_GetIndexBuffer(ImguiBindings_ContextHandle handle);
 
 #endif // end GFX_IMGUI_AL2O3_THEFORGE_BINDINGS_H_
