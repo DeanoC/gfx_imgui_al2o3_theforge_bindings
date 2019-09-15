@@ -186,7 +186,6 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 
 static bool CreateRenderThings(ImguiBindings_Context *ctx,
 															 TinyImageFormat renderTargetFormat,
-															 TinyImageFormat depthStencilFormat,
 															 TheForge_SampleCount sampleCount,
 															 uint32_t sampleQuality) {
 	if (!CreateShaders(ctx))
@@ -311,11 +310,11 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	gfxPipeDesc.rootSignature = ctx->rootSignature;
 	gfxPipeDesc.pVertexLayout = &vertexLayout;
 	gfxPipeDesc.blendState = ctx->blendState;
-	gfxPipeDesc.depthState = ctx->depthState;
+	gfxPipeDesc.depthState = nullptr;
 	gfxPipeDesc.rasterizerState = ctx->rasterizationState;
 	gfxPipeDesc.renderTargetCount = 1;
 	gfxPipeDesc.pColorFormats = &renderTargetFormat;
-	gfxPipeDesc.depthStencilFormat = depthStencilFormat;
+	gfxPipeDesc.depthStencilFormat = TinyImageFormat_UNDEFINED;
 	gfxPipeDesc.sampleCount = sampleCount;
 	gfxPipeDesc.sampleQuality = sampleQuality;
 	gfxPipeDesc.primitiveTopo = TheForge_PT_TRI_LIST;
@@ -389,7 +388,6 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 																																uint32_t maxDynamicUIUpdatesPerBatch,
 																																uint32_t maxFrames,
 																																TinyImageFormat renderTargetFormat,
-																																TinyImageFormat depthStencilFormat,
 																																TheForge_SampleCount sampleCount,
 																																uint32_t sampleQuality) {
 	auto ctx = (ImguiBindings_Context *) MEMORY_CALLOC(1, sizeof(ImguiBindings_Context));
@@ -406,8 +404,7 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 	ctx->context = ImGui::CreateContext();
 	ImGui::SetCurrentContext(ctx->context);
 
-	if (!CreateRenderThings(ctx,
-													renderTargetFormat, depthStencilFormat, sampleCount, sampleQuality)) {
+	if (!CreateRenderThings(ctx, renderTargetFormat, sampleCount, sampleQuality)) {
 		ImguiBindings_Destroy(ctx);
 		return nullptr;
 	}
