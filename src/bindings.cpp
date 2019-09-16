@@ -23,13 +23,15 @@ struct ImguiBindings_Context {
 
 	uint32_t currentFrame;
 
-	TheForge_ShaderHandle shader;
+	bool sharedState;
 	TheForge_SamplerHandle bilinearSampler;
 	TheForge_BlendStateHandle blendState;
-	TheForge_RootSignatureHandle rootSignature;
-	TheForge_PipelineHandle pipeline;
 	TheForge_DepthStateHandle depthState;
 	TheForge_RasterizerStateHandle rasterizationState;
+
+	TheForge_ShaderHandle shader;
+	TheForge_RootSignatureHandle rootSignature;
+	TheForge_PipelineHandle pipeline;
 	TheForge_DescriptorBinderHandle descriptorBinder;
 	TheForge_BufferHandle vertexBuffer;
 	TheForge_BufferHandle indexBuffer;
@@ -185,6 +187,7 @@ static bool CreateFontTexture(ImguiBindings_Context *ctx) {
 }
 
 static bool CreateRenderThings(ImguiBindings_Context *ctx,
+															 ImguiBindings_Shared const *shared,
 															 TinyImageFormat renderTargetFormat,
 															 TheForge_SampleCount sampleCount,
 															 uint32_t sampleQuality) {
@@ -193,45 +196,76 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	if (!CreateFontTexture(ctx))
 		return false;
 
-	static TheForge_SamplerDesc const samplerDesc{
-			TheForge_FT_LINEAR,
-			TheForge_FT_LINEAR,
-			TheForge_MM_LINEAR,
-			TheForge_AM_CLAMP_TO_EDGE,
-			TheForge_AM_CLAMP_TO_EDGE,
-			TheForge_AM_CLAMP_TO_EDGE,
-	};
-	static TheForge_VertexLayout const vertexLayout{
-			3,
-			{
-					{TheForge_SS_POSITION, 8, "POSITION", TinyImageFormat_R32G32_SFLOAT, 0, 0, 0},
-					{TheForge_SS_TEXCOORD0, 9, "TEXCOORD",TinyImageFormat_R32G32_SFLOAT, 0, 1, sizeof(float) * 2},
-					{TheForge_SS_COLOR, 5, "COLOR", TinyImageFormat_R8G8B8A8_UNORM, 0, 2, sizeof(float) * 4}
-			}
-	};
-	static TheForge_BlendStateDesc const blendDesc{
-			{TheForge_BC_SRC_ALPHA},
-			{TheForge_BC_ONE_MINUS_SRC_ALPHA},
-			{TheForge_BC_ONE},
-			{TheForge_BC_ZERO},
-			{TheForge_BM_ADD},
-			{TheForge_BM_ADD},
-			{0xF},
-			TheForge_BST_0,
-			false, false
-	};
-	static TheForge_DepthStateDesc const depthStateDesc{
-        false, false,
-        TheForge_CMP_ALWAYS,
-	};
-	static TheForge_RasterizerStateDesc const rasterizerStateDesc{
-			TheForge_CM_NONE,
-			0,
-			0.0,
-			TheForge_FM_SOLID,
-			false,
-			true,
-	};
+	TheForge_VertexLayout const *vertexLayout = nullptr;
+	if (!shared) {
+		static TheForge_SamplerDesc const samplerDesc{
+				TheForge_FT_LINEAR,
+				TheForge_FT_LINEAR,
+				TheForge_MM_LINEAR,
+				TheForge_AM_CLAMP_TO_EDGE,
+				TheForge_AM_CLAMP_TO_EDGE,
+				TheForge_AM_CLAMP_TO_EDGE,
+		};
+		static TheForge_VertexLayout const staticVertexLayout{
+				3,
+				{
+						{TheForge_SS_POSITION, 8, "POSITION", TinyImageFormat_R32G32_SFLOAT, 0, 0, 0},
+						{TheForge_SS_TEXCOORD0, 9, "TEXCOORD", TinyImageFormat_R32G32_SFLOAT, 0, 1, sizeof(float) * 2},
+						{TheForge_SS_COLOR, 5, "COLOR", TinyImageFormat_R8G8B8A8_UNORM, 0, 2, sizeof(float) * 4}
+				}
+		};
+		static TheForge_BlendStateDesc const blendDesc{
+				{TheForge_BC_SRC_ALPHA},
+				{TheForge_BC_ONE_MINUS_SRC_ALPHA},
+				{TheForge_BC_ONE},
+				{TheForge_BC_ZERO},
+				{TheForge_BM_ADD},
+				{TheForge_BM_ADD},
+				{0xF},
+				TheForge_BST_0,
+				false, false
+		};
+		static TheForge_DepthStateDesc const depthStateDesc{
+				false, false,
+				TheForge_CMP_ALWAYS,
+		};
+		static TheForge_RasterizerStateDesc const rasterizerStateDesc{
+				TheForge_CM_NONE,
+				0,
+				0.0,
+				TheForge_FM_SOLID,
+				false,
+				true,
+		};
+
+		TheForge_AddSampler(ctx->renderer, &samplerDesc, &ctx->bilinearSampler);
+		TheForge_AddBlendState(ctx->renderer, &blendDesc, &ctx->blendState);
+		TheForge_AddDepthState(ctx->renderer, &depthStateDesc, &ctx->depthState);
+		TheForge_AddRasterizerState(ctx->renderer, &rasterizerStateDesc, &ctx->rasterizationState);
+		vertexLayout = &staticVertexLayout;
+		ctx->sharedState = false;
+	} else {
+		ctx->bilinearSampler = shared->bilinearSampler;
+		ctx->blendState = shared->porterDuffBlendState;
+		ctx->depthState = shared->ignoreDepthState;
+		ctx->rasterizationState = shared->solidNoCullRasterizerState;
+		vertexLayout = shared->twoD_PackedColour_UVVertexLayout;
+		ctx->sharedState = true;
+	}
+
+	if (!ctx->bilinearSampler) {
+		return false;
+	}
+	if (!ctx->blendState) {
+		return false;
+	}
+	if (!ctx->depthState) {
+		return false;
+	}
+	if (!ctx->rasterizationState) {
+		return false;
+	}
+
 	static TheForge_BufferDesc const vbDesc{
 			ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME * sizeof(ImDrawVert) * ctx->maxFrames,
 			TheForge_RMU_CPU_TO_GPU,
@@ -277,18 +311,6 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			TheForge_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 	};
 
-	TheForge_AddSampler(ctx->renderer, &samplerDesc, &ctx->bilinearSampler);
-	if (!ctx->bilinearSampler)
-		return false;
-	TheForge_AddBlendState(ctx->renderer, &blendDesc, &ctx->blendState);
-	if (!ctx->blendState)
-		return false;
-	TheForge_AddDepthState(ctx->renderer, &depthStateDesc, &ctx->depthState);
-	if (!ctx->depthState)
-		return false;
-	TheForge_AddRasterizerState(ctx->renderer, &rasterizerStateDesc, &ctx->rasterizationState);
-	if (!ctx->rasterizationState)
-		return false;
 
 	TheForge_ShaderHandle shaders[]{ctx->shader};
 	TheForge_SamplerHandle samplers[]{ctx->bilinearSampler};
@@ -308,7 +330,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 	TheForge_GraphicsPipelineDesc &gfxPipeDesc = pipelineDesc.graphicsDesc;
 	gfxPipeDesc.shaderProgram = ctx->shader;
 	gfxPipeDesc.rootSignature = ctx->rootSignature;
-	gfxPipeDesc.pVertexLayout = &vertexLayout;
+	gfxPipeDesc.pVertexLayout = vertexLayout;
 	gfxPipeDesc.blendState = ctx->blendState;
 	gfxPipeDesc.depthState = nullptr;
 	gfxPipeDesc.rasterizerState = ctx->rasterizationState;
@@ -361,14 +383,22 @@ static void DestroyRenderThings(ImguiBindings_Context *ctx) {
 		TheForge_RemovePipeline(ctx->renderer, ctx->pipeline);
 	if (ctx->rootSignature)
 		TheForge_RemoveRootSignature(ctx->renderer, ctx->rootSignature);
-	if (ctx->rasterizationState)
-		TheForge_RemoveRasterizerState(ctx->renderer, ctx->rasterizationState);
-	if (ctx->depthState)
-		TheForge_RemoveDepthState(ctx->renderer, ctx->depthState);
-	if (ctx->blendState)
-		TheForge_RemoveBlendState(ctx->renderer, ctx->blendState);
-	if (ctx->bilinearSampler)
-		TheForge_RemoveSampler(ctx->renderer, ctx->bilinearSampler);
+
+	if (!ctx->sharedState) {
+		if (ctx->rasterizationState) {
+			TheForge_RemoveRasterizerState(ctx->renderer, ctx->rasterizationState);
+		}
+		if (ctx->depthState) {
+			TheForge_RemoveDepthState(ctx->renderer, ctx->depthState);
+		}
+		if (ctx->blendState) {
+			TheForge_RemoveBlendState(ctx->renderer, ctx->blendState);
+		}
+		if (ctx->bilinearSampler) {
+			TheForge_RemoveSampler(ctx->renderer, ctx->bilinearSampler);
+		}
+	}
+
 	if (ctx->shader)
 		TheForge_RemoveShader(ctx->renderer, ctx->shader);
 }
@@ -385,6 +415,7 @@ static void free_func(void *ptr, void *user_data) {
 AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_RendererHandle renderer,
 																																ShaderCompiler_ContextHandle shaderCompiler,
 																																InputBasic_ContextHandle input,
+																																ImguiBindings_Shared const *shared,
 																																uint32_t maxDynamicUIUpdatesPerBatch,
 																																uint32_t maxFrames,
 																																TinyImageFormat renderTargetFormat,
@@ -404,7 +435,7 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 	ctx->context = ImGui::CreateContext();
 	ImGui::SetCurrentContext(ctx->context);
 
-	if (!CreateRenderThings(ctx, renderTargetFormat, sampleCount, sampleQuality)) {
+	if (!CreateRenderThings(ctx, shared, renderTargetFormat, sampleCount, sampleQuality)) {
 		ImguiBindings_Destroy(ctx);
 		return nullptr;
 	}

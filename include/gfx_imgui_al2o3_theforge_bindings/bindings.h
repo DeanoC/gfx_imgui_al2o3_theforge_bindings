@@ -16,10 +16,20 @@ typedef struct ImguiBindings_Texture {
 	TheForge_TextureHandle gpu;
 } ImguiBindings_Texture;
 
+typedef struct ImguiBindings_Shared {
+	TheForge_SamplerHandle bilinearSampler;
+	TheForge_BlendStateHandle porterDuffBlendState;
+	TheForge_DepthStateHandle ignoreDepthState;
+	TheForge_RasterizerStateHandle solidNoCullRasterizerState;
+	TheForge_VertexLayout const *twoD_PackedColour_UVVertexLayout;
+
+} ImguiBindings_Shared;
+
 typedef struct ImguiBindings_Context *ImguiBindings_ContextHandle;
 AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_RendererHandle renderer,
 																																ShaderCompiler_ContextHandle shaderCompiler,
 																																InputBasic_ContextHandle input,
+																																ImguiBindings_Shared const *shared, // can be null
 																																uint32_t maxDynamicUIUpdatesPerBatch,
 																																uint32_t maxFrames,
 																																TinyImageFormat renderTargetFormat,
