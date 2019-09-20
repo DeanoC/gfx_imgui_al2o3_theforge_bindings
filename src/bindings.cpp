@@ -562,9 +562,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 			{ctx->indexBuffer, TheForge_RS_INDEX_BUFFER},
 	};
 
-	TheForge_CmdResourceBarrier(cmd, 2, barriers,
-															0, nullptr,
-															true);
+	TheForge_CmdResourceBarrier(cmd, 2, barriers, 0, nullptr);
 
 	float const left = drawData->DisplayPos.x;
 	float const right = drawData->DisplayPos.x + drawData->DisplaySize.x;
