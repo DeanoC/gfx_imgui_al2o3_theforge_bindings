@@ -80,11 +80,11 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 																						"\tfloat4 Colour   : COLOR;\n"
 																						"};\n"
 																						"\n"
-																						"Texture2D colourTexture : register(t1, space1);\n"
-																						"SamplerState bilinearSampler : register(s1, space2);\n"
+																						"Texture2D colourTexture : register(t1, space2);\n"
+																						"SamplerState bilinearSampler : register(s1, space0);\n"
 																						"float4 FS_main(FSInput input) : SV_Target\n"
 																						"{\n"
-																						"\treturn input.Colour;/* * colourTexture.Sample(bilinearSampler, input.Uv);*/\n"
+																						"\treturn input.Colour * colourTexture.Sample(bilinearSampler, input.Uv);\n"
 																						"}\n";
 
 	static char const *const vertEntryPoint = "VS_main";
@@ -366,7 +366,7 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			ctx->maxFrames
 	};
 
-	TheForge_AddDescriptorSet(ctx->renderer, &setDescTexture, &ctx->descriptorSetUniform);
+	TheForge_AddDescriptorSet(ctx->renderer, &setDescUniform, &ctx->descriptorSetUniform);
 	if (!ctx->descriptorSetUniform) {
 		return false;
 	}
@@ -390,9 +390,15 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			return false;
 		}
 
+		uint64_t const offsets[] = {0};
+		uint64_t const sizes[] = {UNIFORM_BUFFER_SIZE_PER_FRAME};
+
 		TheForge_DescriptorData descData{"uniformBlockVS"};
+		descData.index = ~0;
 		descData.pBuffers = ctx->uniformBuffers + i;
 		descData.count = 1;
+		descData.pOffsets = offsets;
+		descData.pSizes = sizes;
 		TheForge_UpdateDescriptorSet(ctx->renderer, i, ctx->descriptorSetUniform, 1, &descData);
 	}
 
@@ -710,6 +716,7 @@ AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle,
 
 				if (texture != lastTexture) {
 					TheForge_DescriptorData descData{"colourTexture"};
+					descData.index = ~0;
 					descData.pTextures = &texture->gpu;
 					descData.count = 1;
 					uint32_t const setIndex = (ctx->maxTextureChangesPerFrame * ctx->currentFrame) + textureChangesThisFrame;
