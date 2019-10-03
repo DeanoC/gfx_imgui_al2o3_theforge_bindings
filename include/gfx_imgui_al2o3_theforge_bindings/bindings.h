@@ -8,8 +8,8 @@
 #include "input_basic/input.h"
 #include "gfx_image/image.h"
 
-static const uint64_t ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME = 1024 * 64;
-static const uint64_t ImguiBindings_MAX_INDEX_COUNT_PER_FRAME = 128 * 1024;
+static const uint64_t ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME = 1024 * 256;
+static const uint64_t ImguiBindings_MAX_INDEX_COUNT_PER_FRAME = ImguiBindings_MAX_VERTEX_COUNT_PER_FRAME * 3;
 
 typedef struct ImguiBindings_Texture {
 	Image_ImageHeader const* cpu;
