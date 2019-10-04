@@ -467,7 +467,7 @@ static void *alloc_func(size_t sz, void *user_data) {
 }
 
 static void free_func(void *ptr, void *user_data) {
-	MEMORY_FREE(user_data);
+	MEMORY_FREE(ptr);
 }
 
 AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_RendererHandle renderer,
@@ -490,7 +490,7 @@ AL2O3_EXTERN_C ImguiBindings_ContextHandle ImguiBindings_Create(TheForge_Rendere
 	ctx->maxTextureChangesPerFrame = maxDynamicUIUpdatesPerBatch;
 	ctx->maxFrames = maxFrames;
 
-	ImGui::SetAllocatorFunctions(alloc_func, free_func);
+	ImGui::SetAllocatorFunctions(alloc_func, free_func, nullptr);
 	ctx->context = ImGui::CreateContext();
 	ImGui::SetCurrentContext(ctx->context);
 
