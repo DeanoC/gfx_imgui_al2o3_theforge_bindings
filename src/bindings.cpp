@@ -545,8 +545,7 @@ AL2O3_EXTERN_C void ImguiBindings_Destroy(ImguiBindings_ContextHandle handle) {
 
 AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle handle,
 																								uint32_t width,
-																								uint32_t height,
-																								float dpiBackingScaleX, float dpiBackingScaleY) {
+																								uint32_t height) {
 	auto ctx = (ImguiBindings_Context *) handle;
 	if (!ctx) {
 		return;
@@ -555,8 +554,8 @@ AL2O3_EXTERN_C void ImguiBindings_SetWindowSize(ImguiBindings_ContextHandle hand
 	ImGuiIO &io = ImGui::GetIO();
 	io.DisplaySize.x = (float) width;
 	io.DisplaySize.y = (float) height;
-	io.DisplayFramebufferScale.x = dpiBackingScaleX;
-	io.DisplayFramebufferScale.y = dpiBackingScaleY;
+	io.DisplayFramebufferScale.x = 1;
+	io.DisplayFramebufferScale.y = 1;
 }
 
 AL2O3_EXTERN_C bool ImguiBindings_UpdateInput(ImguiBindings_ContextHandle handle, double deltaTimeInMS) {
