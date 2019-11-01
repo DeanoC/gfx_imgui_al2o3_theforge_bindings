@@ -1,6 +1,4 @@
 #pragma once
-#ifndef GFX_IMGUI_AL2O3_THEFORGE_BINDINGS_H_
-#define GFX_IMGUI_AL2O3_THEFORGE_BINDINGS_H_
 
 #include "al2o3_platform/platform.h"
 #include "gfx_theforge/theforge.h"
@@ -45,5 +43,3 @@ AL2O3_EXTERN_C bool ImguiBindings_UpdateInput(ImguiBindings_ContextHandle handle
 AL2O3_EXTERN_C uint32_t ImguiBindings_Render(ImguiBindings_ContextHandle handle, TheForge_CmdHandle cmd);
 
 AL2O3_EXTERN_C float const* ImguiBindings_GetScaleOffsetMatrix(ImguiBindings_ContextHandle handle);
-
-#endif // end GFX_IMGUI_AL2O3_THEFORGE_BINDINGS_H_
