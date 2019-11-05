@@ -133,11 +133,9 @@ static bool CreateShaders(ImguiBindings_Context *ctx) {
 	sdesc.vert.name = "ImguiBindings_VertexShader";
 	sdesc.vert.code = (char *) vout.shader;
 	sdesc.vert.entryPoint = vertEntryPoint;
-	sdesc.vert.macroCount = 0;
 	sdesc.frag.name = "ImguiBindings_FragmentShader";
 	sdesc.frag.code = (char *) fout.shader;
 	sdesc.frag.entryPoint = fragEntryPoint;
-	sdesc.frag.macroCount = 0;
 	TheForge_AddShader(ctx->renderer, &sdesc, &ctx->shader);
 #else
 	TheForge_BinaryShaderDesc bdesc;
@@ -281,6 +279,9 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			0,
 			0,
 			0,
+			TheForge_IAT_DRAW,
+			0,
+			0,
 			nullptr,
 			TinyImageFormat_UNDEFINED,
 			TheForge_DESCRIPTOR_TYPE_VERTEX_BUFFER,
@@ -293,6 +294,9 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			TheForge_IT_UINT16,
 			0,
 			0,
+			0,
+			0,
+			TheForge_IAT_DRAW,
 			0,
 			0,
 			nullptr,
@@ -309,6 +313,9 @@ static bool CreateRenderThings(ImguiBindings_Context *ctx,
 			TheForge_IT_UINT16,
 			0,
 			0,
+			0,
+			0,
+			TheForge_IAT_DRAW,
 			0,
 			0,
 			nullptr,
